@@ -344,6 +344,79 @@ app.get("/api/blogs/:slug", async (req, res, next) => {
 });
 
 // Create the initial admin from environment variables
+
+app.post("/api/blogs", requireLogin, async (req, res, next) => {
+  try {
+    const title = typeof req.body.title === "string"
+      ? req.body.title.trim() : "";
+    const content = typeof req.body.content === "string"
+      ? req.body.content.trim() : "";
+
+    if (title.length < 3 || title.length > 120 ||
+        content.length < 10 || content.length > 20000) {
+      return res.status(400).json({
+        error: "Invalid title or content."
+      });
+    }
+
+    const slug = `${makeSlug(title)}-${crypto.randomBytes(3).toString("hex")}`;
+    const blog = await Blog.create({
+      title, content, slug, author: req.session.user.id
+    });
+
+    res.status(201).json(blog);
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.put("/api/blogs/:slug", requireLogin, async (req, res, next) => {
+  try {
+    const blog = await Blog.findOne({ slug: req.params.slug });
+    if (!blog) return res.status(404).json({ error: "Blog not found." });
+
+    if (!canEdit(blog, req.session.user)) {
+      return res.status(403).json({ error: "Access denied." });
+    }
+
+    const title = typeof req.body.title === "string"
+      ? req.body.title.trim() : "";
+    const content = typeof req.body.content === "string"
+      ? req.body.content.trim() : "";
+
+    if (title.length < 3 || title.length > 120 ||
+        content.length < 10 || content.length > 20000) {
+      return res.status(400).json({
+        error: "Invalid title or content."
+      });
+    }
+
+    blog.title = title;
+    blog.content = content;
+    await blog.save();
+
+    res.json(blog);
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.delete("/api/blogs/:slug", requireLogin, async (req, res, next) => {
+  try {
+    const blog = await Blog.findOne({ slug: req.params.slug });
+    if (!blog) return res.status(404).json({ error: "Blog not found." });
+
+    if (!canEdit(blog, req.session.user)) {
+      return res.status(403).json({ error: "Access denied." });
+    }
+
+    await blog.deleteOne();
+    res.json({ message: "Blog deleted successfully." });
+  } catch (err) {
+    next(err);
+  }
+});
+
 async function createAdmin() {
   if (!process.env.ADMIN_EMAIL || !process.env.ADMIN_PASSWORD) {
     console.log("Admin setup skipped: set ADMIN_EMAIL and ADMIN_PASSWORD.");

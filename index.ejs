@@ -1,0 +1,202 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="csrf-token" content="<%= csrfToken %>">
+  <title><%= selectedBlog ? selectedBlog.title : "My Blog Website" %></title>
+  <meta name="description" content="Read and publish interesting blog posts.">
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f3f6fb;
+      color: #1e293b;
+    }
+    header {
+      background: #172554;
+      color: white;
+      padding: 18px 7%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    header a { color: white; text-decoration: none; margin: 5px; }
+    main { max-width: 850px; margin: 30px auto; padding: 0 18px; }
+    .card {
+      background: white;
+      padding: 22px;
+      margin: 18px 0;
+      border-radius: 12px;
+      box-shadow: 0 3px 12px #0000000c;
+    }
+    input, textarea {
+      display: block;
+      width: 100%;
+      padding: 12px;
+      margin: 12px 0;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      font: inherit;
+    }
+    textarea { min-height: 180px; resize: vertical; }
+    button, .btn {
+      display: inline-block;
+      padding: 10px 15px;
+      border: 0;
+      border-radius: 6px;
+      background: #2563eb;
+      color: white;
+      cursor: pointer;
+      text-decoration: none;
+      font: inherit;
+    }
+    .danger { background: #dc2626; }
+    .muted { color: #64748b; }
+    .message { background: #dbeafe; padding: 12px; border-radius: 6px; }
+    .content { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.7; }
+    footer { text-align: center; padding: 25px; color: #64748b; }
+  </style>
+</head>
+<body>
+<header>
+  <a href="/"><strong>My Blog</strong></a>
+  <nav>
+    <a href="/">Home</a>
+    <% if (currentUser) { %>
+      <a href="/new">Write Blog</a>
+      <span><%= currentUser.username %>
+        (<%= currentUser.role %>)</span>
+      <form action="/logout" method="POST" style="display:inline">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <button type="submit">Logout</button>
+      </form>
+    <% } else { %>
+      <a href="/login">Login</a>
+      <a href="/register">Register</a>
+    <% } %>
+  </nav>
+</header>
+
+<main>
+  <% if (message) { %>
+    <p class="message"><%= message %></p>
+  <% } %>
+
+  <% if (page === "home") { %>
+    <h1>Explore Blogs</h1>
+    <p class="muted">Read ideas and share your own stories.</p>
+
+    <% if (currentUser) { %>
+      <a class="btn" href="/new">+ Create a Blog</a>
+    <% } %>
+
+    <% if (blogs.length === 0) { %>
+      <div class="card">No blog posts yet. Be the first to write one!</div>
+    <% } %>
+
+    <% blogs.forEach(blog => { %>
+      <article class="card">
+        <h2><a href="/blogs/<%= encodeURIComponent(blog.slug) %>">
+          <%= blog.title %>
+        </a></h2>
+        <p class="muted">
+          By <%= blog.author.username %> ·
+          <%= new Date(blog.createdAt).toLocaleDateString() %>
+        </p>
+        <p class="content"><%= blog.content.slice(0, 180) %><%= blog.content.length > 180 ? "..." : "" %></p>
+        <a class="btn" href="/blogs/<%= encodeURIComponent(blog.slug) %>">
+          Read More
+        </a>
+      </article>
+    <% }) %>
+
+  <% } else if (page === "register") { %>
+    <div class="card">
+      <h1>Create Account</h1>
+      <p class="muted">New accounts receive the User role.</p>
+      <form action="/register" method="POST">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <label>Username</label>
+        <input name="username" required minlength="2" maxlength="40">
+        <label>Email</label>
+        <input type="email" name="email" required>
+        <label>Password (at least 8 characters)</label>
+        <input type="password" name="password" required minlength="8" maxlength="100">
+        <button type="submit">Register</button>
+      </form>
+      <p>Already registered? <a href="/login">Login</a></p>
+    </div>
+
+  <% } else if (page === "login") { %>
+    <div class="card">
+      <h1>Login</h1>
+      <form action="/login" method="POST">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <label>Email</label>
+        <input type="email" name="email" required>
+        <label>Password</label>
+        <input type="password" name="password" required>
+        <button type="submit">Login</button>
+      </form>
+      <p>New here? <a href="/register">Create an account</a></p>
+    </div>
+
+  <% } else if (page === "new" || page === "edit") { %>
+    <div class="card">
+      <h1><%= page === "new" ? "Write a Blog" : "Edit Blog" %></h1>
+      <form
+        action="<%= page === 'new' ? '/blogs' : '/blogs/' + encodeURIComponent(selectedBlog.slug) %>"
+        method="POST">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <% if (page === "edit") { %>
+          <input type="hidden" name="_method" value="PUT">
+        <% } %>
+        <label>Blog Title</label>
+        <input name="title" required minlength="3" maxlength="120"
+          value="<%= page === 'edit' ? selectedBlog.title : '' %>">
+        <label>Blog Content</label>
+        <textarea name="content" required minlength="10" maxlength="20000"><%= page === "edit" ? selectedBlog.content : "" %></textarea>
+        <button type="submit">
+          <%= page === "new" ? "Publish Blog" : "Save Changes" %>
+        </button>
+        <a href="/" class="btn">Cancel</a>
+      </form>
+    </div>
+
+  <% } else if (page === "detail") { %>
+    <article class="card">
+      <h1><%= selectedBlog.title %></h1>
+      <p class="muted">
+        By <%= selectedBlog.author.username %> ·
+        <%= new Date(selectedBlog.createdAt).toLocaleDateString() %>
+      </p>
+      <div class="content"><%= selectedBlog.content %></div>
+      <% if (currentUser &&
+        (currentUser.role === "admin" ||
+         currentUser.id === selectedBlog.author._id.toString())) { %>
+        <p>
+          <a class="btn" href="/blogs/<%= encodeURIComponent(selectedBlog.slug) %>/edit">
+            Edit
+          </a>
+        </p>
+        <form action="/blogs/<%= encodeURIComponent(selectedBlog.slug) %>"
+          method="POST"
+          onsubmit="return confirm('Delete this blog post?')">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <input type="hidden" name="_method" value="DELETE">
+          <button class="danger" type="submit">Delete Blog</button>
+        </form>
+      <% } %>
+    </article>
+    <a href="/">← Back to all blogs</a>
+  <% } %>
+</main>
+
+<footer>My Blog Website · Built with Node.js, Express and MongoDB</footer>
+</body>
+</html>
